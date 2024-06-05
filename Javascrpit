@@ -1,0 +1,103 @@
+Import necessary libraries
+import * as tf from '@tensorflow/tfjs';
+
+// Load the data
+const data = tf.data.csv('data.csv', {
+  columnNames: ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Sentiment', 'Fundamental'],
+  delimiter: ',',
+  hasHeader: true
+});
+
+// Preprocess the data
+const features = data.map((row) => {
+  return [
+    row.get('Open'),
+    row.get('High'),
+    row.get('Low'),
+    row.get('Volume'),
+    row.get('Sentiment'),
+    row.get('Fundamental')
+  ];
+});
+
+const labels = data.map((row) => {
+  return row.get('Close');
+});
+
+// Split the data into training and testing sets
+const [trainFeatures, testFeatures, trainLabels, testLabels] = tf.split(features, labels, 0.8);
+
+// Create the LSTM model
+const model = tf.sequential();
+model.add(tf.layers.lstm({ units: 32, inputShape: [1, 6] }));
+model.add(tf.layers.dense({ units: 1 }));
+model.compile({ optimizer: tf.optimizers.adam(), loss: 'eanSquaredError' });
+
+// Train the model
+model.fit(trainFeatures, trainLabels, { epochs: 100, batchSize: 8 });
+
+// Make predictions on the test set
+const predictions = model.predict(testFeatures);
+
+// Evaluate the model
+const mse = tf.metrics.meanSquaredError(testLabels, predictions);
+console.log(`MSE: ${mse}`);
+
+// Define a function to execute swing trades
+function executeSwingTrades(predictions, risk) {
+  const trades = [];
+  for (let i = 0; i < predictions.length; i++) {
+    const prediction = predictions[i];
+    const currentPrice = testLabels[i];
+    const riskAmount = currentPrice * risk;
+    if (prediction > currentPrice + riskAmount) {
+      trades.push({ type: 'buy', price: currentPrice });
+    } else if (prediction < currentPrice - riskAmount) {
+      trades.push({ type: 'ell', price: currentPrice });
+    }
+  }
+  return trades;
+}
+
+// Execute swing trades with 20% risk
+const trades = executeSwingTrades(predictions, 0.2);
+
+// Display the trades
+console.log('Trades:');
+trades.forEach((trade) => {
+  console.log(`${trade.type} at ${trade.price}`);
+});
+
+
+
+HTML
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Swing Trading Model</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
+  <script src="script.js"></script>
+</head>
+<body>
+  <h1>Swing Trading Model</h1>
+  <div id="trades"></div>
+  <button onclick="executeTrades()">Execute Trades</button>
+  <script>
+    function executeTrades() {
+      const trades = executeSwingTrades(predictions, 0.2);
+      const tradesDiv = document.getElementById('trades');
+      tradesDiv.innerHTML = '';
+      trades.forEach((trade) => {
+        const tradeDiv = document.createElement('div');
+        tradeDiv.textContent = `${trade.type} at ${trade.price}`;
+        tradesDiv.appendChild(tradeDiv);
+      });
+    }
+  </script>
+</body>
+</html>
+
+
+This HTML page includes a button that, when clicked, executes the executeTrades() function, which calls the executeSwingTrades() function with the predictions and risk level as inputs. The resulting trades are then displayed in the #trades div.
